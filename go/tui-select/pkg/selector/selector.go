@@ -1,6 +1,7 @@
 package selector
 
 import (
+	"strconv"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -46,7 +47,10 @@ func New(items []string, opts Options) Model {
 	// Build styles
 	var hlStyle, prefixStyle lipgloss.Style
 	if opts.Color >= 0 && opts.Color <= 7 {
-		bg := lipgloss.Color(opts.Color)
+		// ANSI color codes: 30-37 for foreground, 40-47 for background
+		// But lipgloss uses string numbers "0"-"15" for 16 colors
+		// 0=black, 1=red, 2=green, 3=yellow, 4=blue, 5=magenta, 6=cyan, 7=white
+		bg := lipgloss.Color(strconv.Itoa(opts.Color))
 		hlStyle = lipgloss.NewStyle().Background(bg).Foreground(lipgloss.Color("0"))
 		prefixStyle = lipgloss.NewStyle().Foreground(bg)
 	} else {
