@@ -267,8 +267,16 @@ func (a *Agent) streamLLMResponse() (string, error) {
 	eventChan, errChan := llm.StreamLLMResponse(ctx, config, packedBuf.String())
 
 	var response strings.Builder
-	var currentLine strings.Builder
+	termWidth := getTerminalWidth()
+	wrapAt := termWidth - MARGIN
+	if wrapAt < 20 {
+		wrapAt = 20 // Minimum wrap width
+	}
+
+	currentColumn := 0
 	isFirstToken := true
+	inReasoning := false
+	yellow := color.New(color.FgYellow)
 
 	for {
 		select {
@@ -280,42 +288,26 @@ func (a *Agent) streamLLMResponse() (string, error) {
 			if event.Content != "" {
 				if isFirstToken {
 					fmt.Print(marginStr())
+					currentColumn = 0
 					isFirstToken = false
 				}
 
-				// Process each character for proper line wrapping
-				for _, ch := range event.Content {
-					if ch == '\n' {
-						fmt.Println()
-						fmt.Print(marginStr())
-						currentLine.Reset()
-					} else {
-						fmt.Print(string(ch))
-						currentLine.WriteRune(ch)
-					}
-				}
-
+				a.printWrappedText(event.Content, &currentColumn, wrapAt, nil)
 				response.WriteString(event.Content)
 			}
 
 			if event.Reasoning != "" && !a.IgnoreReasoning {
 				if isFirstToken {
 					fmt.Print(marginStr())
+					currentColumn = 0
 					isFirstToken = false
 				}
 
-				// Process reasoning content similarly
-				for _, ch := range event.Reasoning {
-					if ch == '\n' {
-						fmt.Println()
-						fmt.Print(marginStr())
-						currentLine.Reset()
-					} else {
-						fmt.Print(string(ch))
-						currentLine.WriteRune(ch)
-					}
+				if !inReasoning {
+					inReasoning = true
 				}
 
+				a.printWrappedText(event.Reasoning, &currentColumn, wrapAt, yellow)
 				response.WriteString(event.Reasoning)
 			}
 		case err := <-errChan:
@@ -397,7 +389,7 @@ func (a *Agent) printTurnHeader(role string, turn int) {
 	prefix := "─────── "
 
 	totalLen := len(prefix) + len(roleText) + len(" • ") + len(turnText) + 1
-	lineLen := width - totalLen - MARGIN*2
+	lineLen := width - totalLen - MARGIN
 	if lineLen < 0 {
 		lineLen = 0
 	}
@@ -598,6 +590,60 @@ func (a *Agent) resumeSession() {
 		fmt.Print(indentMultiline(lastAssistantMessage))
 		fmt.Println()
 	}
+}
+
+func (a *Agent) printWrappedText(text string, currentColumn *int, wrapAt int, colorFunc *color.Color) {
+	// Split by newlines first to preserve them
+	lines := strings.Split(text, "\n")
+	for lineIdx, line := range lines {
+		if lineIdx > 0 {
+			// Print newline and reset for new line
+			fmt.Println()
+			fmt.Print(marginStr())
+			*currentColumn = 0
+		}
+
+		// Now split this line by spaces for word wrapping
+		words := strings.Fields(line)
+		for i, word := range words {
+			// Add space before word if not at line start
+			if i > 0 && *currentColumn > 0 {
+				if *currentColumn+1+len(word) > wrapAt {
+					// Word would exceed line, wrap
+					fmt.Println()
+					fmt.Print(marginStr())
+					*currentColumn = 0
+				} else {
+					// Add space
+					if colorFunc != nil {
+						colorFunc.Print(" ")
+					} else {
+						fmt.Print(" ")
+					}
+					*currentColumn++
+				}
+			}
+			a.printWord(word, currentColumn, wrapAt, colorFunc)
+		}
+	}
+}
+
+func (a *Agent) printWord(word string, currentColumn *int, wrapAt int, colorFunc *color.Color) {
+	wordLen := len(word)
+
+	// If word is longer than wrap width, print it anyway
+	if *currentColumn > 0 && *currentColumn+wordLen > wrapAt && wordLen < wrapAt {
+		fmt.Println()
+		fmt.Print(marginStr())
+		*currentColumn = 0
+	}
+
+	if colorFunc != nil {
+		colorFunc.Print(word)
+	} else {
+		fmt.Print(word)
+	}
+	*currentColumn += wordLen
 }
 
 func getTerminalWidth() int {
