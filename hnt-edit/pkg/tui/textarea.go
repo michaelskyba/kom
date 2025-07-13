@@ -73,7 +73,7 @@ func PromptForInput() (string, error) {
 
 	// Set a reasonable size
 	ta.SetWidth(80)
-	ta.SetHeight(10)
+	ta.SetHeight(7)
 
 	m := textareaModel{
 		textarea: ta,

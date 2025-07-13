@@ -71,7 +71,7 @@ func PromptForInput() (string, error) {
 	ta.KeyMap.InsertNewline.SetEnabled(true)
 
 	ta.SetWidth(80)
-	ta.SetHeight(10)
+	ta.SetHeight(7)
 
 	m := textareaModel{
 		textarea: ta,
