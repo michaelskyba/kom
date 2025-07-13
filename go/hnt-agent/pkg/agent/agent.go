@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"hnt-agent/pkg/spinner"
+	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -39,6 +40,7 @@ type Agent struct {
 	shellExecutor    *shell.Executor
 	turnCounter      int
 	humanTurnCounter int
+	logger           *log.Logger
 }
 
 type Config struct {
@@ -62,7 +64,7 @@ func New(cfg Config) (*Agent, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to get conversations dir: %w", err)
 		}
-		
+
 		convDir, err := chat.CreateNewConversation(baseDir)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create conversation: %w", err)
@@ -102,6 +104,16 @@ func New(cfg Config) (*Agent, error) {
 		}
 	}
 
+	// Create debug log file
+	var logger *log.Logger
+	if debugEnv := os.Getenv("HNT_AGENT_DEBUG"); debugEnv != "" {
+		logFile, err := os.Create(filepath.Join(cfg.ConversationDir, "hnt-agent-debug.log"))
+		if err == nil {
+			logger = log.New(logFile, "[HNT-AGENT] ", log.Ltime|log.Lmicroseconds)
+			logger.Printf("Debug logging enabled for conversation: %s", cfg.ConversationDir)
+		}
+	}
+
 	return &Agent{
 		ConversationDir:  cfg.ConversationDir,
 		SystemPrompt:     cfg.SystemPrompt,
@@ -116,6 +128,7 @@ func New(cfg Config) (*Agent, error) {
 		shellExecutor:    executor,
 		turnCounter:      1,
 		humanTurnCounter: 1,
+		logger:           logger,
 	}, nil
 }
 
@@ -321,6 +334,10 @@ func (a *Agent) streamLLMResponse() (string, string, error) {
 			}
 
 			if event.Content != "" {
+				if a.logger != nil {
+					a.logger.Printf("Received content chunk: %q (len=%d)", event.Content, len(event.Content))
+				}
+
 				if isFirstToken {
 					fmt.Print(marginStr())
 					currentColumn = 0
@@ -330,6 +347,10 @@ func (a *Agent) streamLLMResponse() (string, string, error) {
 				// Print content directly without buffering
 				a.printWrappedText(event.Content, &currentColumn, wrapAt, nil)
 				response.WriteString(event.Content)
+
+				if a.logger != nil {
+					a.logger.Printf("Current response so far: %q", response.String())
+				}
 			}
 
 			if event.Reasoning != "" && !a.IgnoreReasoning {
@@ -630,37 +651,57 @@ func (a *Agent) resumeSession() {
 }
 
 func (a *Agent) printWrappedText(text string, currentColumn *int, wrapAt int, colorFunc *color.Color) {
-	// Split by newlines first to preserve them
-	lines := strings.Split(text, "\n")
-	for lineIdx, line := range lines {
-		if lineIdx > 0 {
-			// Print newline and reset for new line
+	if a.logger != nil {
+		a.logger.Printf("printWrappedText called with: %q (currentColumn=%d, wrapAt=%d)", text, *currentColumn, wrapAt)
+	}
+
+	// Process character by character to preserve exact spacing
+	for i := 0; i < len(text); i++ {
+		ch := text[i]
+
+		if ch == '\n' {
+			// Handle newline
 			fmt.Println()
 			fmt.Print(marginStr())
 			*currentColumn = 0
-		}
-
-		// Now split this line by spaces for word wrapping
-		words := strings.Fields(line)
-		for i, word := range words {
-			// Add space before word if not at line start
-			if i > 0 && *currentColumn > 0 {
-				if *currentColumn+1+len(word) > wrapAt {
-					// Word would exceed line, wrap
-					fmt.Println()
-					fmt.Print(marginStr())
-					*currentColumn = 0
+		} else if ch == ' ' {
+			// Handle space - check if we need to wrap
+			if *currentColumn >= wrapAt {
+				fmt.Println()
+				fmt.Print(marginStr())
+				*currentColumn = 0
+			} else {
+				// Print the space
+				if colorFunc != nil {
+					colorFunc.Print(" ")
 				} else {
-					// Add space
-					if colorFunc != nil {
-						colorFunc.Print(" ")
-					} else {
-						fmt.Print(" ")
-					}
-					*currentColumn++
+					fmt.Print(" ")
 				}
+				*currentColumn++
 			}
-			a.printWord(word, currentColumn, wrapAt, colorFunc)
+		} else {
+			// For non-space characters, find the whole word
+			wordStart := i
+			for i < len(text) && text[i] != ' ' && text[i] != '\n' {
+				i++
+			}
+			word := text[wordStart:i]
+			i-- // Back up one since the loop will increment
+
+			// Check if word fits on current line
+			if *currentColumn > 0 && *currentColumn+len(word) > wrapAt {
+				fmt.Println()
+				fmt.Print(marginStr())
+				*currentColumn = 0
+			}
+
+			// Print the word
+			if colorFunc != nil {
+				colorFunc.Print(word)
+			} else {
+				fmt.Print(word)
+			}
+			*currentColumn += len(word)
 		}
 	}
 }
