@@ -152,15 +152,30 @@ func (a *Agent) Run(userMessage string) error {
 		a.printTurnHeader("hinata", a.turnCounter)
 		a.turnCounter++
 
-		llmResponse, err := a.streamLLMResponse()
+		llmContent, llmReasoning, err := a.streamLLMResponse()
 		if err != nil {
 			return fmt.Errorf("failed to generate LLM response: %w", err)
 		}
 
 		fmt.Println()
 
-		if err := a.writeMessage("assistant", llmResponse); err != nil {
+		// Save reasoning to separate file if present
+		if llmReasoning != "" && !a.IgnoreReasoning {
+			thinkContent := fmt.Sprintf("<think>%s</think>", llmReasoning)
+			if err := a.writeMessage("assistant-reasoning", thinkContent); err != nil {
+				return err
+			}
+		}
+
+		// Save only content to assistant file
+		if err := a.writeMessage("assistant", llmContent); err != nil {
 			return err
+		}
+
+		// Combine for shell command extraction
+		llmResponse := llmContent
+		if llmReasoning != "" && !a.IgnoreReasoning {
+			llmResponse = fmt.Sprintf("<think>%s</think>\n%s", llmReasoning, llmContent)
 		}
 
 		shellCommands := extractShellCommands(llmResponse)
@@ -251,11 +266,11 @@ func (a *Agent) Run(userMessage string) error {
 	}
 }
 
-func (a *Agent) streamLLMResponse() (string, error) {
+func (a *Agent) streamLLMResponse() (string, string, error) {
 	var packedBuf bytes.Buffer
 	err := chat.PackConversation(a.ConversationDir, &packedBuf, false)
 	if err != nil {
-		return "", fmt.Errorf("failed to pack conversation: %w", err)
+		return "", "", fmt.Errorf("failed to pack conversation: %w", err)
 	}
 
 	config := llm.Config{
@@ -267,6 +282,7 @@ func (a *Agent) streamLLMResponse() (string, error) {
 	eventChan, errChan := llm.StreamLLMResponse(ctx, config, packedBuf.String())
 
 	var response strings.Builder
+	var reasoningBuffer strings.Builder
 	termWidth := getTerminalWidth()
 	wrapAt := termWidth - MARGIN
 	if wrapAt < 20 {
@@ -278,11 +294,22 @@ func (a *Agent) streamLLMResponse() (string, error) {
 	inReasoning := false
 	yellow := color.New(color.FgYellow)
 
+	// Buffer to accumulate partial content between chunks
+	var contentBuffer strings.Builder
+	var reasoningChunkBuffer strings.Builder
+
 	for {
 		select {
 		case event, ok := <-eventChan:
 			if !ok {
-				return response.String(), nil
+				// Flush any remaining buffered content
+				if contentBuffer.Len() > 0 {
+					a.printWrappedText(contentBuffer.String(), &currentColumn, wrapAt, nil)
+				}
+				if reasoningChunkBuffer.Len() > 0 {
+					a.printWrappedText(reasoningChunkBuffer.String(), &currentColumn, wrapAt, yellow)
+				}
+				return response.String(), reasoningBuffer.String(), nil
 			}
 
 			if event.Content != "" {
@@ -292,8 +319,20 @@ func (a *Agent) streamLLMResponse() (string, error) {
 					isFirstToken = false
 				}
 
-				a.printWrappedText(event.Content, &currentColumn, wrapAt, nil)
+				contentBuffer.WriteString(event.Content)
 				response.WriteString(event.Content)
+
+				// Only print complete segments (ending with space or newline)
+				content := contentBuffer.String()
+				lastSpace := strings.LastIndexAny(content, " \n")
+				if lastSpace >= 0 {
+					toPrint := content[:lastSpace+1]
+					a.printWrappedText(toPrint, &currentColumn, wrapAt, nil)
+					contentBuffer.Reset()
+					if lastSpace < len(content)-1 {
+						contentBuffer.WriteString(content[lastSpace+1:])
+					}
+				}
 			}
 
 			if event.Reasoning != "" && !a.IgnoreReasoning {
@@ -307,12 +346,24 @@ func (a *Agent) streamLLMResponse() (string, error) {
 					inReasoning = true
 				}
 
-				a.printWrappedText(event.Reasoning, &currentColumn, wrapAt, yellow)
-				response.WriteString(event.Reasoning)
+				reasoningChunkBuffer.WriteString(event.Reasoning)
+				reasoningBuffer.WriteString(event.Reasoning)
+
+				// Only print complete segments
+				reasoning := reasoningChunkBuffer.String()
+				lastSpace := strings.LastIndexAny(reasoning, " \n")
+				if lastSpace >= 0 {
+					toPrint := reasoning[:lastSpace+1]
+					a.printWrappedText(toPrint, &currentColumn, wrapAt, yellow)
+					reasoningChunkBuffer.Reset()
+					if lastSpace < len(reasoning)-1 {
+						reasoningChunkBuffer.WriteString(reasoning[lastSpace+1:])
+					}
+				}
 			}
 		case err := <-errChan:
 			if err != nil {
-				return "", fmt.Errorf("LLM request failed: %w\nModel: %s", err, a.Model)
+				return "", "", fmt.Errorf("LLM request failed: %w\nModel: %s", err, a.Model)
 			}
 		}
 	}
