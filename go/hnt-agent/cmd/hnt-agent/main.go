@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 	"hnt-agent/pkg/agent"
-	"io"
 	"os"
 	"path/filepath"
+	"shared/pkg/prompt"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -24,6 +24,7 @@ var (
 	useJSON          bool
 	spinnerIndex     int
 	useSpinner       bool
+	useEditor        bool
 )
 
 func main() {
@@ -44,6 +45,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&shellDisplay, "shell-results-display-xml", false, "Display shell command results")
 	rootCmd.Flags().BoolVar(&useJSON, "json", false, "Output shell results as JSON")
 	rootCmd.Flags().IntVar(&spinnerIndex, "spinner", -1, "Use specific spinner by index")
+	rootCmd.Flags().BoolVar(&useEditor, "use-editor", false, "Use an external editor ($EDITOR) for the user instruction message")
 	
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -72,7 +74,7 @@ func run(cmd *cobra.Command, args []string) error {
 	if message != "" {
 		userMessage = message
 	} else {
-		msg, err := promptForMessage()
+		msg, err := promptForMessage(useEditor)
 		if err != nil {
 			return err
 		}
@@ -95,6 +97,7 @@ func run(cmd *cobra.Command, args []string) error {
 		ShellDisplay:    shellDisplay,
 		UseJSON:         useJSON,
 		SpinnerIndex:    spinnerPtr,
+		UseEditor:       useEditor,
 	}
 	
 	ag, err := agent.New(cfg)
@@ -157,18 +160,6 @@ func loadDefaultPrompt() (string, error) {
 	return strings.Join(parts, "\n\n"), nil
 }
 
-func promptForMessage() (string, error) {
-	fmt.Println("Enter your message (press Ctrl+D when done):")
-	
-	content, err := io.ReadAll(os.Stdin)
-	if err != nil {
-		return "", err
-	}
-	
-	message := strings.TrimSpace(string(content))
-	if message == "" {
-		return "", fmt.Errorf("no message provided")
-	}
-	
-	return message, nil
+func promptForMessage(useEditor bool) (string, error) {
+	return prompt.GetUserInstruction("", useEditor)
 }
