@@ -466,6 +466,10 @@ func (a *Agent) saveState() error {
 func (a *Agent) printTurnHeader(role string, turn int) {
 	width := getTerminalWidth()
 
+	if a.logger != nil {
+		a.logger.Printf("getTerminalWidth returned: %d", width)
+	}
+
 	var icon string
 	var lineColor *color.Color
 
@@ -486,14 +490,72 @@ func (a *Agent) printTurnHeader(role string, turn int) {
 	prefix := "─────── "
 
 	// Calculate visual width using runewidth
-	totalLen := runewidth.StringWidth(prefix) + runewidth.StringWidth(roleText) +
-		runewidth.StringWidth(" • ") + runewidth.StringWidth(turnText) + 1
-	lineLen := width - totalLen - MARGIN
+	marginPart := marginStr()
+	prefixPart := prefix     // "─────── "
+	roleTextPart := roleText // e.g. "🗝️ querent"
+	bulletPart := " • "
+	turnTextPart := turnText // e.g. "turn 1"
+	spacePart := " "
+
+	marginWidth := runewidth.StringWidth(marginPart)
+	prefixWidth := runewidth.StringWidth(prefixPart)
+	roleWidth := runewidth.StringWidth(roleTextPart)
+	bulletWidth := runewidth.StringWidth(bulletPart)
+	turnWidth := runewidth.StringWidth(turnTextPart)
+	spaceWidth := runewidth.StringWidth(spacePart)
+
+	// Emoji width correction: these emojis display as double-width but runewidth
+	// may report them as single-width
+	if icon == "❄️" || icon == "🗝️" {
+		// Add 1 to compensate for emoji being double-width
+		roleWidth += 1
+	}
+
+	totalFixedContent := prefixWidth + roleWidth + bulletWidth + turnWidth + spaceWidth
+
+	if a.logger != nil {
+		a.logger.Printf("=== printTurnHeader for '%s' turn %d ===", role, turn)
+		a.logger.Printf("Terminal width: %d", width)
+		a.logger.Printf("Parts to print:")
+		a.logger.Printf("  1. margin: '%s' (width=%d)", marginPart, marginWidth)
+		a.logger.Printf("  2. prefix: '%s' (width=%d)", prefixPart, prefixWidth)
+		if icon == "❄️" || icon == "🗝️" {
+			a.logger.Printf("  3. roleText: '%s' (width=%d, corrected for emoji)", roleTextPart, roleWidth)
+		} else {
+			a.logger.Printf("  3. roleText: '%s' (width=%d)", roleTextPart, roleWidth)
+		}
+		a.logger.Printf("  4. bullet: '%s' (width=%d)", bulletPart, bulletWidth)
+		a.logger.Printf("  5. turnText: '%s' (width=%d)", turnTextPart, turnWidth)
+		a.logger.Printf("  6. space: '%s' (width=%d)", spacePart, spaceWidth)
+		a.logger.Printf("  7. line: will be repeated '─' characters")
+		a.logger.Printf("Total fixed content width (2-6): %d", totalFixedContent)
+	}
+
+	// Calculate line length to ensure proper right margin
+	// Terminal width: 88
+	// We want the line to end at column 86 (leaving 2 spaces)
+	// The content starts at column 3 (after 2-space margin)
+	// So we have 84 columns for actual content (86 - 2)
+	// Subtract the fixed content length to get the line length
+	lineLen := (width - (MARGIN * 2)) - totalFixedContent
 	if lineLen < 0 {
 		lineLen = 0
 	}
 
 	line := strings.Repeat("─", lineLen)
+
+	if a.logger != nil {
+		a.logger.Printf("Line calculation:")
+		a.logger.Printf("  Available width for content: %d - %d (both margins) = %d", width, MARGIN*2, width-(MARGIN*2))
+		a.logger.Printf("  Fixed content uses: %d", totalFixedContent)
+		a.logger.Printf("  Space left for line: %d - %d = %d", width-(MARGIN*2), totalFixedContent, lineLen)
+		a.logger.Printf("  Line will be: '%s' (length=%d)", line, len(line))
+		a.logger.Printf("Final total: %d (margin) + %d (fixed) + %d (line) = %d",
+			marginWidth, totalFixedContent, lineLen, marginWidth+totalFixedContent+lineLen)
+		a.logger.Printf("Expected to end at column: %d", marginWidth+totalFixedContent+lineLen)
+		a.logger.Printf("Leaves %d columns at the end", width-(marginWidth+totalFixedContent+lineLen))
+		a.logger.Printf("===")
+	}
 
 	fmt.Print(marginStr())
 	lineColor.Print(prefix)
