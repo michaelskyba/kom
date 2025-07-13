@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"shared/pkg/prompt"
-	"strings"
 
 	"github.com/spf13/cobra"
 )
@@ -130,43 +129,32 @@ func readSystemPrompt(path string) (string, error) {
 }
 
 func loadDefaultPrompt() (string, error) {
+	// First try HINATA_PROMPTS_DIR environment variable
 	promptsDir := os.Getenv("HINATA_PROMPTS_DIR")
-	if promptsDir == "" {
-		configDir := os.Getenv("XDG_CONFIG_HOME")
-		if configDir == "" {
-			var err error
-			configDir, err = os.UserConfigDir()
-			if err != nil {
-				return "", err
-			}
-		}
-		promptsDir = filepath.Join(configDir, "hinata/prompts")
-	}
-
-	agentPromptsDir := filepath.Join(promptsDir, "hnt-agent")
-
-	promptFiles := []string{
-		"main-shell_agent.md",
-		"01-hnt-shell-xml.md",
-		"02-clarify-turns.md",
-		"03-agent-tools.md",
-		"04-generalnotproject-and-xmldashes.md",
-	}
-
-	var parts []string
-
-	for _, file := range promptFiles {
-		path := filepath.Join(agentPromptsDir, file)
-		if content, err := os.ReadFile(path); err == nil {
-			parts = append(parts, string(content))
+	if promptsDir != "" {
+		promptPath := filepath.Join(promptsDir, "hnt-agent/main-shell_agent.md")
+		if content, err := os.ReadFile(promptPath); err == nil {
+			return string(content), nil
 		}
 	}
 
-	if len(parts) == 0 {
-		return "", fmt.Errorf("no prompt files found in %s", agentPromptsDir)
+	// Fall back to XDG_CONFIG_HOME/hinata/prompts
+	configDir := os.Getenv("XDG_CONFIG_HOME")
+	if configDir == "" {
+		var err error
+		configDir, err = os.UserConfigDir()
+		if err != nil {
+			return "", err
+		}
 	}
 
-	return strings.Join(parts, "\n\n"), nil
+	promptPath := filepath.Join(configDir, "hinata/prompts/hnt-agent/main-shell_agent.md")
+	content, err := os.ReadFile(promptPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read prompt file %s: %w", promptPath, err)
+	}
+
+	return string(content), nil
 }
 
 func promptForMessage(useEditor bool) (string, error) {
