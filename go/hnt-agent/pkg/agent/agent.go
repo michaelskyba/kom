@@ -2,11 +2,12 @@ package agent
 
 import (
 	"bufio"
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"hnt-agent/pkg/spinner"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"shared/pkg/prompt"
@@ -15,6 +16,9 @@ import (
 	"time"
 
 	"github.com/fatih/color"
+	"github.com/veilm/hinata/hnt-chat/pkg/chat"
+	"github.com/veilm/hinata/hnt-llm/pkg/llm"
+	"golang.org/x/term"
 )
 
 const MARGIN = 2
@@ -136,7 +140,7 @@ func (a *Agent) Run(userMessage string) error {
 	a.printTurnHeader("querent", a.humanTurnCounter)
 	a.humanTurnCounter++
 	fmt.Print(indentMultiline(userMessage))
-	fmt.Println("\n")
+	fmt.Println()
 
 	taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", userMessage)
 	if err := a.writeMessage("user", taggedMessage); err != nil {
@@ -175,7 +179,7 @@ func (a *Agent) Run(userMessage string) error {
 				a.printTurnHeader("querent", a.humanTurnCounter)
 				a.humanTurnCounter++
 				fmt.Print(indentMultiline(newMessage))
-				fmt.Println("\n")
+				fmt.Println()
 
 				taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
 				if err := a.writeMessage("user", taggedMessage); err != nil {
@@ -203,7 +207,7 @@ func (a *Agent) Run(userMessage string) error {
 					a.printTurnHeader("querent", a.humanTurnCounter)
 					a.humanTurnCounter++
 					fmt.Print(indentMultiline(newMessage))
-					fmt.Println("\n")
+					fmt.Println()
 
 					taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
 					if err := a.writeMessage("user", taggedMessage); err != nil {
@@ -249,27 +253,37 @@ func (a *Agent) Run(userMessage string) error {
 }
 
 func (a *Agent) generateLLMResponse() (string, error) {
-	packCmd := exec.Command("hnt-chat", "pack", "-c", a.ConversationDir)
-	packedConv, err := packCmd.CombinedOutput()
+	var packedBuf bytes.Buffer
+	err := chat.PackConversation(a.ConversationDir, &packedBuf, false)
 	if err != nil {
-		return "", fmt.Errorf("failed to pack conversation with hnt-chat: %w\nOutput: %s", err, string(packedConv))
+		return "", fmt.Errorf("failed to pack conversation: %w", err)
 	}
 
-	llmCmd := exec.Command("hnt-llm", "--model", a.Model)
-	if !a.IgnoreReasoning {
-		llmCmd.Args = append(llmCmd.Args, "--include-reasoning")
+	config := llm.Config{
+		Model:            a.Model,
+		IncludeReasoning: !a.IgnoreReasoning,
 	}
 
-	llmCmd.Stdin = strings.NewReader(string(packedConv))
-	output, err := llmCmd.CombinedOutput()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return "", fmt.Errorf("LLM request failed with exit code %d: %w\nModel: %s\nOutput: %s", exitErr.ExitCode(), err, a.Model, string(output))
+	ctx := context.Background()
+	eventChan, errChan := llm.StreamLLMResponse(ctx, config, packedBuf.String())
+
+	var response strings.Builder
+	for {
+		select {
+		case event, ok := <-eventChan:
+			if !ok {
+				return response.String(), nil
+			}
+			response.WriteString(event.Content)
+			if event.Reasoning != "" && !a.IgnoreReasoning {
+				response.WriteString(event.Reasoning)
+			}
+		case err := <-errChan:
+			if err != nil {
+				return "", fmt.Errorf("LLM request failed: %w\nModel: %s", err, a.Model)
+			}
 		}
-		return "", fmt.Errorf("LLM request failed: %w\nModel: %s\nOutput: %s", err, a.Model, string(output))
 	}
-
-	return string(output), nil
 }
 
 func (a *Agent) executeShellCommands(commands string) (*shell.ExecutionResult, error) {
@@ -293,10 +307,14 @@ func (a *Agent) executeShellCommands(commands string) (*shell.ExecutionResult, e
 }
 
 func (a *Agent) writeMessage(role, content string) error {
-	cmd := exec.Command("hnt-chat", "add", "-c", a.ConversationDir, role)
-	cmd.Stdin = strings.NewReader(content)
-	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("failed to write message with hnt-chat: %w\nRole: %s\nOutput: %s", err, role, string(output))
+	chatRole, err := chat.ParseRole(role)
+	if err != nil {
+		return fmt.Errorf("invalid role %s: %w", role, err)
+	}
+
+	_, err = chat.WriteMessageFile(a.ConversationDir, chatRole, content)
+	if err != nil {
+		return fmt.Errorf("failed to write message: %w", err)
 	}
 	return nil
 }
@@ -489,18 +507,14 @@ func (a *Agent) resumeSession() {
 
 		a.printTurnHeader("hinata", assistantCount)
 		fmt.Print(indentMultiline(lastAssistantMessage))
-		fmt.Println("\n")
+		fmt.Println()
 	}
 }
 
 func getTerminalWidth() int {
-	cmd := exec.Command("tput", "cols")
-	output, err := cmd.Output()
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil {
 		return 80
 	}
-
-	var width int
-	fmt.Sscanf(string(output), "%d", &width)
 	return width
 }
