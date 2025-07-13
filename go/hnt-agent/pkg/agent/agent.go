@@ -17,6 +17,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
+	"github.com/mattn/go-runewidth"
 	"github.com/veilm/hinata/hnt-chat/pkg/chat"
 	"github.com/veilm/hinata/hnt-llm/pkg/llm"
 	"github.com/veilm/hinata/tui-select/pkg/selector"
@@ -161,6 +162,7 @@ func (a *Agent) Run(userMessage string) error {
 	a.humanTurnCounter++
 	fmt.Print(indentMultiline(userMessage))
 	fmt.Println()
+	fmt.Println()
 
 	taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", userMessage)
 	if err := a.writeMessage("user", taggedMessage); err != nil {
@@ -210,6 +212,7 @@ func (a *Agent) Run(userMessage string) error {
 			a.humanTurnCounter++
 			fmt.Print(indentMultiline(newMessage))
 			fmt.Println()
+			fmt.Println()
 
 			taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
 			if err := a.writeMessage("user", taggedMessage); err != nil {
@@ -238,6 +241,7 @@ func (a *Agent) Run(userMessage string) error {
 					a.printTurnHeader("querent", a.humanTurnCounter)
 					a.humanTurnCounter++
 					fmt.Print(indentMultiline(newMessage))
+					fmt.Println()
 					fmt.Println()
 
 					taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
@@ -276,9 +280,44 @@ func (a *Agent) Run(userMessage string) error {
 				return err
 			}
 
+			// Display shell output to the user
 			if a.ShellDisplay {
 				fmt.Println()
 				fmt.Print(indentMultiline(resultMessage))
+				fmt.Println()
+			} else {
+				// Display colored output like Rust version
+				stdoutContent := strings.TrimSpace(result.Stdout)
+				stderrContent := strings.TrimSpace(result.Stderr)
+				exitCode := result.ExitCode
+
+				if stdoutContent != "" {
+					cyan := color.New(color.FgCyan)
+					cyan.Print(indentMultiline(stdoutContent))
+					fmt.Println()
+				}
+
+				if stdoutContent != "" && stderrContent != "" {
+					fmt.Println()
+				}
+
+				if stderrContent != "" {
+					red := color.New(color.FgRed)
+					red.Print(indentMultiline(stderrContent))
+					fmt.Println()
+				}
+
+				if stdoutContent != "" && stderrContent == "" && exitCode != 0 {
+					fmt.Println()
+				}
+
+				if exitCode != 0 {
+					exitMessage := fmt.Sprintf("🫀 exit code: %d", exitCode)
+					red := color.New(color.FgRed)
+					red.Print(indentMultiline(exitMessage))
+					fmt.Println()
+				}
+
 				fmt.Println()
 			}
 		}
@@ -446,7 +485,9 @@ func (a *Agent) printTurnHeader(role string, turn int) {
 	turnText := fmt.Sprintf("turn %d", turn)
 	prefix := "─────── "
 
-	totalLen := len(prefix) + len(roleText) + len(" • ") + len(turnText) + 1
+	// Calculate visual width using runewidth
+	totalLen := runewidth.StringWidth(prefix) + runewidth.StringWidth(roleText) +
+		runewidth.StringWidth(" • ") + runewidth.StringWidth(turnText) + 1
 	lineLen := width - totalLen - MARGIN
 	if lineLen < 0 {
 		lineLen = 0
