@@ -10,9 +10,9 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/veilm/hinata/hnt-apply/pkg/apply"
 	"github.com/veilm/hinata/hnt-chat/pkg/chat"
-	"shared/pkg/prompt"
 	"github.com/veilm/hinata/hnt-llm/pkg/llm"
 	"github.com/veilm/hinata/llm-pack/pkg/pack"
+	"shared/pkg/prompt"
 )
 
 type Options struct {

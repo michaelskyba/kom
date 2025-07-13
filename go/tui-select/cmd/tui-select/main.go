@@ -18,9 +18,11 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "tui-select",
-		Short: "Select an item from a list read from stdin",
-		RunE:  run,
+		Use:           "tui-select",
+		Short:         "Select an item from a list read from stdin",
+		RunE:          run,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.Flags().IntVar(&height, "height", 10, "The height of the selection menu")

@@ -17,10 +17,12 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "hnt-apply [source files...]",
-		Short: "A utility to apply file modifications based on structured blocks from stdin",
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  run,
+		Use:           "hnt-apply [source files...]",
+		Short:         "A utility to apply file modifications based on structured blocks from stdin",
+		Args:          cobra.MinimumNArgs(1),
+		RunE:          run,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.Flags().BoolVar(&disallowCreating, "disallow-creating", false, "Disallow creating new files")

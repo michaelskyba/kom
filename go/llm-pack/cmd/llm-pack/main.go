@@ -17,10 +17,12 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "llm-pack [source files...]",
-		Short: "A utility to pack source files for language models",
-		Args:  cobra.MinimumNArgs(1),
-		RunE:  run,
+		Use:           "llm-pack [source files...]",
+		Short:         "A utility to pack source files for language models",
+		Args:          cobra.MinimumNArgs(1),
+		RunE:          run,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.Flags().BoolVarP(&noFences, "no-fences", "n", false, "Disable printing the markdown code fences (```)")

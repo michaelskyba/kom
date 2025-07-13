@@ -21,6 +21,8 @@ Example: hnt-edit -m 'Refactor foo function' src/main.py src/utils.py`,
 			opts.SourceFiles = args
 			return edit.Run(opts)
 		},
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.Flags().StringVarP(&opts.System, "system", "s", "", "System message string or path to system message file")
