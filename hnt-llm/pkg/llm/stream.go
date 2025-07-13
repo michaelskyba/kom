@@ -96,13 +96,7 @@ func StreamLLMResponse(ctx context.Context, config Config, promptContent string)
 		}
 
 		req.Header.Set("Content-Type", "application/json")
-		authHeader := "Bearer " + apiKey
-		if providerName == "google" {
-			authHeader = apiKey
-			req.Header.Set("x-goog-api-key", authHeader)
-		} else {
-			req.Header.Set("Authorization", authHeader)
-		}
+		req.Header.Set("Authorization", "Bearer "+apiKey)
 
 		for k, v := range provider.ExtraHeaders {
 			req.Header.Set(k, v)
