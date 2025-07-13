@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"shared/pkg/prompt"
+	"shared/pkg/terminal"
 
 	"github.com/spf13/cobra"
 )
@@ -27,6 +28,9 @@ var (
 )
 
 func main() {
+	// Ensure terminal compatibility
+	terminal.EnsureCompatibleTerm()
+
 	rootCmd := &cobra.Command{
 		Use:           "hnt-agent",
 		Short:         "Interact with hinata LLM agent to execute shell commands",

@@ -9,6 +9,7 @@ require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/mattn/go-runewidth v0.0.16
 	github.com/spf13/cobra v1.9.1
+	shared v0.0.0
 )
 
 require (
@@ -32,3 +33,5 @@ require (
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect
 )
+
+replace shared => ../shared

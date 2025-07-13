@@ -8,6 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 	"github.com/veilm/hinata/tui-select/pkg/selector"
+	"shared/pkg/terminal"
 )
 
 var (
@@ -17,6 +18,9 @@ var (
 )
 
 func main() {
+	// Ensure terminal compatibility
+	terminal.EnsureCompatibleTerm()
+
 	var rootCmd = &cobra.Command{
 		Use:           "tui-select",
 		Short:         "Select an item from a list read from stdin",
