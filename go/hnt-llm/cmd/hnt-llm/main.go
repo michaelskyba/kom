@@ -109,9 +109,11 @@ func main() {
 	}
 
 	var rootCmd = &cobra.Command{
-		Use:   "hnt-llm",
-		Short: "A streamlined CLI for interacting with multiple LLM providers",
-		RunE:  doGenerate,
+		Use:           "hnt-llm",
+		Short:         "A streamlined CLI for interacting with multiple LLM providers",
+		RunE:          doGenerate,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.PersistentFlags().StringVarP(&model, "model", "m", "", "The model to use for the LLM")
@@ -121,34 +123,38 @@ func main() {
 	rootCmd.Flags().BoolVar(&includeReasoning, "include-reasoning", false, "Include reasoning in the output")
 
 	var genCmd = &cobra.Command{
-		Use:   "gen",
-		Short: "Generate text using a language model",
-		RunE:  doGenerate,
+		Use:          "gen",
+		Short:        "Generate text using a language model",
+		RunE:         doGenerate,
+		SilenceUsage: true,
 	}
 	genCmd.Flags().StringVarP(&systemPrompt, "system", "s", "", "The system prompt to use")
 	genCmd.Flags().BoolVar(&includeReasoning, "include-reasoning", false, "Include reasoning in the output")
 
 	var saveKeyCmd = &cobra.Command{
-		Use:   "save-key [provider]",
-		Short: "Save an API key for a service",
-		Args:  cobra.ExactArgs(1),
+		Use:          "save-key [provider]",
+		Short:        "Save an API key for a service",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return keymanagement.HandleSaveKey(args[0])
 		},
 	}
 
 	var listKeysCmd = &cobra.Command{
-		Use:   "list-keys",
-		Short: "List saved API keys",
+		Use:          "list-keys",
+		Short:        "List saved API keys",
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return keymanagement.HandleListKeys()
 		},
 	}
 
 	var deleteKeyCmd = &cobra.Command{
-		Use:   "delete-key [provider]",
-		Short: "Delete a saved API key",
-		Args:  cobra.ExactArgs(1),
+		Use:          "delete-key [provider]",
+		Short:        "Delete a saved API key",
+		Args:         cobra.ExactArgs(1),
+		SilenceUsage: true,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return keymanagement.HandleDeleteKey(args[0])
 		},

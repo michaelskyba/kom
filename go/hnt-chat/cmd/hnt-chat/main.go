@@ -27,40 +27,46 @@ var (
 
 func main() {
 	var rootCmd = &cobra.Command{
-		Use:   "hnt-chat",
-		Short: "Hinata Chat CLI tool",
+		Use:           "hnt-chat",
+		Short:         "Hinata Chat CLI tool",
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	var newCmd = &cobra.Command{
-		Use:     "new",
-		Aliases: []string{"new-conversation"},
-		Short:   "Create a new conversation directory",
-		RunE:    handleNewCommand,
+		Use:          "new",
+		Aliases:      []string{"new-conversation"},
+		Short:        "Create a new conversation directory",
+		RunE:         handleNewCommand,
+		SilenceUsage: true,
 	}
 
 	var addCmd = &cobra.Command{
-		Use:     "add [role]",
-		Aliases: []string{"add-message"},
-		Short:   "Add a message to a conversation",
-		Args:    cobra.ExactArgs(1),
-		RunE:    handleAddCommand,
+		Use:          "add [role]",
+		Aliases:      []string{"add-message"},
+		Short:        "Add a message to a conversation",
+		Args:         cobra.ExactArgs(1),
+		RunE:         handleAddCommand,
+		SilenceUsage: true,
 	}
 	addCmd.Flags().StringVarP(&conversationPath, "conversation", "c", "", "Path to conversation directory")
 	addCmd.Flags().BoolVar(&separateReasoning, "separate-reasoning", false, "For assistant role, save <think> content separately")
 
 	var packCmd = &cobra.Command{
-		Use:     "pack",
-		Aliases: []string{"package"},
-		Short:   "Pack conversation messages for processing",
-		RunE:    handlePackCommand,
+		Use:          "pack",
+		Aliases:      []string{"package"},
+		Short:        "Pack conversation messages for processing",
+		RunE:         handlePackCommand,
+		SilenceUsage: true,
 	}
 	packCmd.Flags().StringVarP(&conversationPath, "conversation", "c", "", "Path to conversation directory")
 	packCmd.Flags().BoolVar(&merge, "merge", false, "Merge consecutive messages from same author")
 
 	var genCmd = &cobra.Command{
-		Use:   "gen",
-		Short: "Generate the next message in a conversation",
-		RunE:  handleGenCommand,
+		Use:          "gen",
+		Short:        "Generate the next message in a conversation",
+		RunE:         handleGenCommand,
+		SilenceUsage: true,
 	}
 	genCmd.Flags().StringVarP(&conversationPath, "conversation", "c", "", "Path to conversation directory")
 	genCmd.Flags().BoolVarP(&write, "write", "w", false, "Write generated output as new assistant message")

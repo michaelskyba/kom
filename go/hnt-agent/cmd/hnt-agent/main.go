@@ -29,9 +29,11 @@ var (
 
 func main() {
 	rootCmd := &cobra.Command{
-		Use:   "hnt-agent",
-		Short: "Interact with hinata LLM agent to execute shell commands",
-		RunE:  run,
+		Use:           "hnt-agent",
+		Short:         "Interact with hinata LLM agent to execute shell commands",
+		RunE:          run,
+		SilenceUsage:  true,
+		SilenceErrors: true,
 	}
 
 	rootCmd.Flags().StringVar(&systemPrompt, "system", "", "System message string or path to system message file")
