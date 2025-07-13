@@ -2,19 +2,28 @@
 
 cd "$(dirname "$0")"
 
-# offer rustup install if cargo not found
-./util/check_cargo_path > /dev/null 2>&1 || ./util/install_rust
-
-# exit if still not found despite attempted install
-if ! ./util/check_cargo_path > /dev/null 2>&1
-then
-	echo "hinata: cargo not found in PATH or CARGO_BIN or HOME/.cargo. exiting"
-	exit 1
+# Check if go is available
+if ! command -v go > /dev/null 2>&1; then
+    echo "hinata: go not found in PATH. Please install Go from https://go.dev"
+    exit 1
 fi
 
-# should be available now. redundant but easy to follow
-cargo=$(./util/check_cargo_path)
+echo "hinata: building binaries..."
 
-echo "hinata: building Rust binaries in release mode..."
+# List of all Go binaries to build
+bins="hnt-llm hnt-chat hnt-apply llm-pack hnt-edit hnt-agent shell-exec tui-select"
 
-$cargo build --release
+# Download dependencies for each module
+echo "hinata: downloading dependencies..."
+for bin in $bins; do
+    echo "hinata: downloading dependencies for $bin..."
+    (cd "$bin" && go mod download)
+done
+
+# Build each binary with .out extension
+for bin in $bins; do
+    echo "hinata: building $bin..."
+    (cd "$bin" && go build -o "../bin/$bin.out" "./cmd/$bin")
+done
+
+echo "hinata: all binaries built successfully in ./bin/"
