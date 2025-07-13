@@ -3,12 +3,16 @@ package main
 import (
 	"fmt"
 	"os"
+	"shared/pkg/terminal"
 
 	"github.com/spf13/cobra"
 	"github.com/veilm/hinata/hnt-edit/pkg/edit"
 )
 
 func main() {
+	// Ensure terminal compatibility
+	terminal.EnsureCompatibleTerm()
+
 	var opts edit.Options
 
 	var rootCmd = &cobra.Command{

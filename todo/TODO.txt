@@ -1,7 +1,6 @@
 - detect if the user's ansi colors are default or switched with something like wal?
 	is that possible? for me in foot I use the theme.ini
 	if default, use rgb, with our own specific built-in theme
-- recompute summaries
 - make a `memory` CLI or something
 	for now it can just have some different profiles (simple .md files)
 	
@@ -29,8 +28,6 @@
 - make it so hnt-shell has a max amount of tokens it can give
 	then it logs the whole message to like /tmp/hnt-shell-1750571344.log
 	so the LLM can read it if it really wants
-- make some way to continue a hnt-agent conversation
-	even if headlesh has to get reset, no big deal
 - maybe always include a <pwd>
 	in each user turn, just for good reference
 	
@@ -44,15 +41,3 @@
 	<after>bar</before>
 	</pwd>
 	or something
-
-- fix degraded performance? 1751510431
-	like util/commit worked better on commit 29e7717621de2467e4ab688008a2a7914e1b0b29
-	on average
-	
-	this might be some subtle ordering or prompting or maybe the /etc/os-release
-	thing actually helped a lot
-	
-	see if you can get a general prompt that helps
-	
-	1751543183 okay the specific util/commit was using the wrong env but keep
-	testing for overall perf
