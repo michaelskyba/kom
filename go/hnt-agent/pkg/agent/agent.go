@@ -166,28 +166,21 @@ func (a *Agent) Run(userMessage string) error {
 
 		shellCommands := extractShellCommands(llmResponse)
 		if len(shellCommands) == 0 {
-			if !a.NoConfirm {
-				fmt.Printf("\n%sHinata has completed its response. Continue?\n", marginStr())
-				if !a.promptContinue() {
-					return nil
-				}
+			fmt.Printf("\n%sLLM provided no command. Please provide new instructions.\n", marginStr())
 
-				newMessage := a.promptForMessage()
-				if newMessage == "" {
-					return fmt.Errorf("no message provided")
-				}
+			newMessage := a.promptForMessage()
+			if newMessage == "" {
+				return fmt.Errorf("Aborted: User did not provide new instructions.")
+			}
 
-				a.printTurnHeader("querent", a.humanTurnCounter)
-				a.humanTurnCounter++
-				fmt.Print(indentMultiline(newMessage))
-				fmt.Println()
+			a.printTurnHeader("querent", a.humanTurnCounter)
+			a.humanTurnCounter++
+			fmt.Print(indentMultiline(newMessage))
+			fmt.Println()
 
-				taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
-				if err := a.writeMessage("user", taggedMessage); err != nil {
-					return err
-				}
-			} else {
-				return nil
+			taggedMessage := fmt.Sprintf("<user_request>\n%s\n</user_request>", newMessage)
+			if err := a.writeMessage("user", taggedMessage); err != nil {
+				return err
 			}
 		} else {
 			commands := shellCommands[len(shellCommands)-1]
@@ -383,7 +376,7 @@ func (a *Agent) printTurnHeader(role string, turn int) {
 }
 
 func (a *Agent) promptContinue() bool {
-	items := []string{"Continue conversation", "Exit"}
+	items := []string{"Retry LLM request.", "Quit."}
 	opts := selector.Options{
 		Height: 2,
 		Color:  4, // Blue
@@ -403,7 +396,7 @@ func (a *Agent) promptContinue() bool {
 		return false
 	}
 
-	return final.Choice() == "Continue conversation"
+	return final.Choice() == "Retry LLM request."
 }
 
 type executeChoice int
@@ -415,10 +408,14 @@ const (
 )
 
 func (a *Agent) promptExecute() executeChoice {
-	items := []string{"Execute shell commands", "Skip and continue conversation", "Exit"}
+	items := []string{
+		"Confirm. Proceed to execute Hinata's shell block.",
+		"Skip this execution. Provide new instructions instead.",
+		"Exit the Hinata session.",
+	}
 	opts := selector.Options{
 		Height: 3,
-		Color:  3, // Yellow
+		Color:  4, // Blue
 		Prefix: "→ ",
 	}
 
@@ -436,9 +433,9 @@ func (a *Agent) promptExecute() executeChoice {
 	}
 
 	switch final.Choice() {
-	case "Execute shell commands":
+	case "Confirm. Proceed to execute Hinata's shell block.":
 		return executeYes
-	case "Skip and continue conversation":
+	case "Skip this execution. Provide new instructions instead.":
 		return executeSkip
 	default:
 		return executeExit
