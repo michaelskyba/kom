@@ -12,19 +12,19 @@ import (
 )
 
 var (
-	systemPrompt     string
-	message          string
-	session          string
-	pwd              string
-	model            string
-	ignoreReasoning  bool
-	noConfirm        bool
-	noEscape         bool
-	shellDisplay     bool
-	useJSON          bool
-	spinnerIndex     int
-	useSpinner       bool
-	useEditor        bool
+	systemPrompt    string
+	message         string
+	session         string
+	pwd             string
+	model           string
+	ignoreReasoning bool
+	noConfirm       bool
+	noEscape        bool
+	shellDisplay    bool
+	useJSON         bool
+	spinnerIndex    int
+	useSpinner      bool
+	useEditor       bool
 )
 
 func main() {
@@ -33,7 +33,7 @@ func main() {
 		Short: "Interact with hinata LLM agent to execute shell commands",
 		RunE:  run,
 	}
-	
+
 	rootCmd.Flags().StringVar(&systemPrompt, "system", "", "System message string or path to system message file")
 	rootCmd.Flags().StringVarP(&message, "message", "m", "", "User instruction message")
 	rootCmd.Flags().StringVarP(&session, "session", "s", "", "Path to conversation directory to resume a session")
@@ -46,7 +46,7 @@ func main() {
 	rootCmd.Flags().BoolVar(&useJSON, "json", false, "Output shell results as JSON")
 	rootCmd.Flags().IntVar(&spinnerIndex, "spinner", -1, "Use specific spinner by index")
 	rootCmd.Flags().BoolVar(&useEditor, "use-editor", false, "Use an external editor ($EDITOR) for the user instruction message")
-	
+
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
@@ -55,7 +55,7 @@ func main() {
 
 func run(cmd *cobra.Command, args []string) error {
 	var sysPrompt string
-	
+
 	if systemPrompt != "" {
 		content, err := readSystemPrompt(systemPrompt)
 		if err != nil {
@@ -67,9 +67,12 @@ func run(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return fmt.Errorf("failed to load default prompt: %w", err)
 		}
+		if defaultPrompt == "" {
+			return fmt.Errorf("no prompt files found. Please ensure prompts are installed in $XDG_CONFIG_HOME/hinata/prompts/hnt-agent/ or ~/.config/hinata/prompts/hnt-agent/")
+		}
 		sysPrompt = defaultPrompt
 	}
-	
+
 	var userMessage string
 	if message != "" {
 		userMessage = message
@@ -80,12 +83,12 @@ func run(cmd *cobra.Command, args []string) error {
 		}
 		userMessage = msg
 	}
-	
+
 	var spinnerPtr *int
 	if spinnerIndex >= 0 {
 		spinnerPtr = &spinnerIndex
 	}
-	
+
 	cfg := agent.Config{
 		ConversationDir: session,
 		SystemPrompt:    sysPrompt,
@@ -99,16 +102,16 @@ func run(cmd *cobra.Command, args []string) error {
 		SpinnerIndex:    spinnerPtr,
 		UseEditor:       useEditor,
 	}
-	
+
 	ag, err := agent.New(cfg)
 	if err != nil {
 		return fmt.Errorf("failed to create agent: %w", err)
 	}
-	
+
 	if session == "" {
 		fmt.Fprintf(os.Stderr, "Created conversation: %s\n", ag.ConversationDir)
 	}
-	
+
 	return ag.Run(userMessage)
 }
 
@@ -120,22 +123,26 @@ func readSystemPrompt(path string) (string, error) {
 		}
 		return string(content), nil
 	}
-	
+
 	return path, nil
 }
 
 func loadDefaultPrompt() (string, error) {
 	promptsDir := os.Getenv("HINATA_PROMPTS_DIR")
 	if promptsDir == "" {
-		configDir, err := os.UserConfigDir()
-		if err != nil {
-			return "", err
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			var err error
+			configDir, err = os.UserConfigDir()
+			if err != nil {
+				return "", err
+			}
 		}
 		promptsDir = filepath.Join(configDir, "hinata/prompts")
 	}
-	
+
 	agentPromptsDir := filepath.Join(promptsDir, "hnt-agent")
-	
+
 	promptFiles := []string{
 		"main-shell_agent.md",
 		"01-hnt-shell-xml.md",
@@ -143,20 +150,20 @@ func loadDefaultPrompt() (string, error) {
 		"03-agent-tools.md",
 		"04-generalnotproject-and-xmldashes.md",
 	}
-	
+
 	var parts []string
-	
+
 	for _, file := range promptFiles {
 		path := filepath.Join(agentPromptsDir, file)
 		if content, err := os.ReadFile(path); err == nil {
 			parts = append(parts, string(content))
 		}
 	}
-	
+
 	if len(parts) == 0 {
 		return "", fmt.Errorf("no prompt files found in %s", agentPromptsDir)
 	}
-	
+
 	return strings.Join(parts, "\n\n"), nil
 }
 

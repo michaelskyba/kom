@@ -108,14 +108,14 @@ func GetRandomLoadingMessage() string {
 
 func Run(spinner Spinner, message string, margin string, stopCh <-chan bool) {
 	fmt.Printf("%s%s", margin, message)
-	
+
 	frameIndex := 0
 	ticker := time.NewTicker(spinner.Speed)
 	defer ticker.Stop()
-	
+
 	hideCursor()
 	defer showCursor()
-	
+
 	for {
 		select {
 		case <-stopCh:
@@ -140,4 +140,3 @@ func showCursor() {
 func clearLine() {
 	fmt.Print("\r\033[K")
 }
-
