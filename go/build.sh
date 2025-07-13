@@ -13,6 +13,13 @@ echo "hinata: building binaries..."
 # List of all Go binaries to build
 bins="hnt-llm hnt-chat hnt-apply llm-pack hnt-edit hnt-agent shell-exec tui-select"
 
+# Download dependencies for each module
+echo "hinata: downloading dependencies..."
+for bin in $bins; do
+    echo "hinata: downloading dependencies for $bin..."
+    (cd "$bin" && go mod download)
+done
+
 # Build each binary with .out extension
 for bin in $bins; do
     echo "hinata: building $bin..."
