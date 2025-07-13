@@ -1,7 +1,6 @@
 package agent
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -15,9 +14,11 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/fatih/color"
 	"github.com/veilm/hinata/hnt-chat/pkg/chat"
 	"github.com/veilm/hinata/hnt-llm/pkg/llm"
+	"github.com/veilm/hinata/tui-select/pkg/selector"
 	"golang.org/x/term"
 )
 
@@ -198,7 +199,11 @@ func (a *Agent) Run(userMessage string) error {
 
 			if !a.NoConfirm {
 				fmt.Printf("\n%sHinata wants to execute a shell block. Proceed?\n", marginStr())
-				if !a.promptExecute() {
+				choice := a.promptExecute()
+				switch choice {
+				case executeExit:
+					return nil
+				case executeSkip:
 					newMessage := a.promptForMessage()
 					if newMessage == "" {
 						return fmt.Errorf("no message provided")
@@ -214,6 +219,8 @@ func (a *Agent) Run(userMessage string) error {
 						return err
 					}
 					continue
+				case executeYes:
+					// Continue with execution
 				}
 			}
 
@@ -376,19 +383,66 @@ func (a *Agent) printTurnHeader(role string, turn int) {
 }
 
 func (a *Agent) promptContinue() bool {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("%s[y/n]: ", marginStr())
-	answer, _ := reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-	return answer == "y" || answer == "yes"
+	items := []string{"Continue conversation", "Exit"}
+	opts := selector.Options{
+		Height: 2,
+		Color:  4, // Blue
+		Prefix: "→ ",
+	}
+
+	model := selector.New(items, opts)
+	p := tea.NewProgram(model)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return false
+	}
+
+	final := finalModel.(selector.Model)
+	if final.Aborted() {
+		return false
+	}
+
+	return final.Choice() == "Continue conversation"
 }
 
-func (a *Agent) promptExecute() bool {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("%s[y/n]: ", marginStr())
-	answer, _ := reader.ReadString('\n')
-	answer = strings.TrimSpace(strings.ToLower(answer))
-	return answer == "y" || answer == "yes"
+type executeChoice int
+
+const (
+	executeYes executeChoice = iota
+	executeSkip
+	executeExit
+)
+
+func (a *Agent) promptExecute() executeChoice {
+	items := []string{"Execute shell commands", "Skip and continue conversation", "Exit"}
+	opts := selector.Options{
+		Height: 3,
+		Color:  3, // Yellow
+		Prefix: "→ ",
+	}
+
+	model := selector.New(items, opts)
+	p := tea.NewProgram(model)
+
+	finalModel, err := p.Run()
+	if err != nil {
+		return executeExit
+	}
+
+	final := finalModel.(selector.Model)
+	if final.Aborted() {
+		return executeExit
+	}
+
+	switch final.Choice() {
+	case "Execute shell commands":
+		return executeYes
+	case "Skip and continue conversation":
+		return executeSkip
+	default:
+		return executeExit
+	}
 }
 
 func (a *Agent) promptForMessage() string {
