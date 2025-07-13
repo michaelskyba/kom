@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/veilm/hinata/hnt-apply/pkg/apply"
 	"github.com/veilm/hinata/hnt-chat/pkg/chat"
-	"github.com/veilm/hinata/hnt-edit/pkg/tui"
+	"shared/pkg/prompt"
 	"github.com/veilm/hinata/hnt-llm/pkg/llm"
 	"github.com/veilm/hinata/llm-pack/pkg/pack"
 )
@@ -51,59 +50,9 @@ func (g *CreatedFilesGuard) Cleanup() {
 }
 
 func GetUserInstruction(message string, useEditor bool) (string, bool, error) {
-	if message != "" {
-		return message, false, nil
-	}
-
-	if useEditor {
-		editor := os.Getenv("EDITOR")
-		if editor == "" {
-			return "", false, fmt.Errorf("EDITOR environment variable not set")
-		}
-
-		tmpfile, err := os.CreateTemp("", "hnt-edit-*.md")
-		if err != nil {
-			return "", false, fmt.Errorf("failed to create temporary file: %w", err)
-		}
-		defer os.Remove(tmpfile.Name())
-
-		initialText := "Replace this text with your instructions. Then write to this file and exit your\ntext editor. Leave the file unchanged or empty to abort."
-		if _, err := tmpfile.Write([]byte(initialText)); err != nil {
-			return "", false, fmt.Errorf("failed to write to temporary file: %w", err)
-		}
-		tmpfile.Close()
-
-		// Parse editor command
-		editorParts := strings.Fields(editor)
-		cmd := exec.Command(editorParts[0], append(editorParts[1:], tmpfile.Name())...)
-		cmd.Stdin = os.Stdin
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-
-		if err := cmd.Run(); err != nil {
-			return "", false, fmt.Errorf("editor exited with error: %w", err)
-		}
-
-		content, err := os.ReadFile(tmpfile.Name())
-		if err != nil {
-			return "", false, fmt.Errorf("failed to read temporary file: %w", err)
-		}
-
-		instruction := string(content)
-		if strings.TrimSpace(instruction) == strings.TrimSpace(initialText) || strings.TrimSpace(instruction) == "" {
-			return "", false, fmt.Errorf("aborted: no changes were made")
-		}
-
-		return instruction, true, nil
-	}
-
-	// Use inline TUI editor
-	instruction, err := tui.PromptForInput()
+	instruction, err := prompt.GetUserInstruction(message, useEditor)
 	if err != nil {
 		return "", false, err
-	}
-	if instruction == "" {
-		return "", false, fmt.Errorf("aborted by user")
 	}
 	return instruction, true, nil
 }

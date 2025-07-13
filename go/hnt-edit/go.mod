@@ -3,20 +3,21 @@ module github.com/veilm/hinata/hnt-edit
 go 1.21
 
 require (
-	github.com/charmbracelet/bubbles v0.18.0
-	github.com/charmbracelet/bubbletea v0.26.1
-	github.com/charmbracelet/lipgloss v0.10.0
+	github.com/charmbracelet/bubbles v0.16.1
+	github.com/charmbracelet/bubbletea v0.24.2
+	github.com/charmbracelet/lipgloss v0.7.1
 	github.com/spf13/cobra v1.8.0
 	github.com/veilm/hinata/hnt-apply v0.0.0-00010101000000-000000000000
 	github.com/veilm/hinata/hnt-chat v0.0.0-00010101000000-000000000000
 	github.com/veilm/hinata/hnt-llm v0.0.0
 	github.com/veilm/hinata/llm-pack v0.0.0-00010101000000-000000000000
+	shared v0.0.0
 )
 
 require (
 	github.com/atotto/clipboard v0.1.4 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
+	github.com/containerd/console v1.0.4-0.20230313162750-1ae8d489ac81 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -41,3 +42,5 @@ replace github.com/veilm/hinata/hnt-chat => ../hnt-chat
 replace github.com/veilm/hinata/hnt-llm => ../hnt-llm
 
 replace github.com/veilm/hinata/llm-pack => ../llm-pack
+
+replace shared => ../shared

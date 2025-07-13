@@ -5,11 +5,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"hnt-agent/pkg/spinner"
-	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"shared/pkg/prompt"
 	"shell-exec/pkg/shell"
 	"strings"
 	"time"
@@ -29,6 +29,7 @@ type Agent struct {
 	ShellDisplay    bool
 	UseJSON         bool
 	SpinnerIndex    *int
+	UseEditor       bool
 	
 	shellExecutor   *shell.Executor
 	turnCounter     int
@@ -46,6 +47,7 @@ type Config struct {
 	ShellDisplay    bool
 	UseJSON         bool
 	SpinnerIndex    *int
+	UseEditor       bool
 }
 
 func New(cfg Config) (*Agent, error) {
@@ -99,6 +101,7 @@ func New(cfg Config) (*Agent, error) {
 		ShellDisplay:    cfg.ShellDisplay,
 		UseJSON:         cfg.UseJSON,
 		SpinnerIndex:    cfg.SpinnerIndex,
+		UseEditor:       cfg.UseEditor,
 		shellExecutor:   executor,
 		turnCounter:     1,
 		humanTurnCounter: 1,
@@ -362,19 +365,17 @@ func (a *Agent) promptExecute() bool {
 }
 
 func (a *Agent) promptForMessage() string {
-	fmt.Printf("%sEnter your message (end with Ctrl+D):\n", marginStr())
-	reader := bufio.NewReader(os.Stdin)
-	var lines []string
+	fmt.Printf("\n%sPlease provide new instructions:\n", marginStr())
 	
-	for {
-		line, err := reader.ReadString('\n')
-		if err == io.EOF {
-			break
+	instruction, err := prompt.GetUserInstruction("", a.UseEditor)
+	if err != nil {
+		if a.UseEditor {
+			fmt.Fprintf(os.Stderr, "%sError: %v\n", marginStr(), err)
 		}
-		lines = append(lines, line)
+		return ""
 	}
 	
-	return strings.TrimSpace(strings.Join(lines, ""))
+	return instruction
 }
 
 func extractShellCommands(text string) []string {
