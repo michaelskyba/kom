@@ -1,6 +1,3 @@
-the docs haven't been updated since
-	vm fa85c9e15777ad48b4cb88f18304aa047ff7756e
-
 you should use find_docs.py and the diff
 
 like make find_docs.py create a simple output of deps
@@ -20,3 +17,6 @@ to make any changes
 idk, or do them one at a time
 haven't thought it through yet
 
+
+1752385370 or just use the wiki approach, since this kind of is just a subset of
+that
