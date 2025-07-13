@@ -149,15 +149,14 @@ func (a *Agent) Run(userMessage string) error {
 	}
 
 	for {
-		llmResponse, err := a.generateLLMResponse()
+		a.printTurnHeader("hinata", a.turnCounter)
+		a.turnCounter++
+
+		llmResponse, err := a.streamLLMResponse()
 		if err != nil {
 			return fmt.Errorf("failed to generate LLM response: %w", err)
 		}
 
-		a.printTurnHeader("hinata", a.turnCounter)
-		a.turnCounter++
-
-		fmt.Print(indentMultiline(llmResponse))
 		fmt.Println()
 
 		if err := a.writeMessage("assistant", llmResponse); err != nil {
@@ -252,7 +251,7 @@ func (a *Agent) Run(userMessage string) error {
 	}
 }
 
-func (a *Agent) generateLLMResponse() (string, error) {
+func (a *Agent) streamLLMResponse() (string, error) {
 	var packedBuf bytes.Buffer
 	err := chat.PackConversation(a.ConversationDir, &packedBuf, false)
 	if err != nil {
@@ -268,14 +267,55 @@ func (a *Agent) generateLLMResponse() (string, error) {
 	eventChan, errChan := llm.StreamLLMResponse(ctx, config, packedBuf.String())
 
 	var response strings.Builder
+	var currentLine strings.Builder
+	isFirstToken := true
+
 	for {
 		select {
 		case event, ok := <-eventChan:
 			if !ok {
 				return response.String(), nil
 			}
-			response.WriteString(event.Content)
+
+			if event.Content != "" {
+				if isFirstToken {
+					fmt.Print(marginStr())
+					isFirstToken = false
+				}
+
+				// Process each character for proper line wrapping
+				for _, ch := range event.Content {
+					if ch == '\n' {
+						fmt.Println()
+						fmt.Print(marginStr())
+						currentLine.Reset()
+					} else {
+						fmt.Print(string(ch))
+						currentLine.WriteRune(ch)
+					}
+				}
+
+				response.WriteString(event.Content)
+			}
+
 			if event.Reasoning != "" && !a.IgnoreReasoning {
+				if isFirstToken {
+					fmt.Print(marginStr())
+					isFirstToken = false
+				}
+
+				// Process reasoning content similarly
+				for _, ch := range event.Reasoning {
+					if ch == '\n' {
+						fmt.Println()
+						fmt.Print(marginStr())
+						currentLine.Reset()
+					} else {
+						fmt.Print(string(ch))
+						currentLine.WriteRune(ch)
+					}
+				}
+
 				response.WriteString(event.Reasoning)
 			}
 		case err := <-errChan:
@@ -380,7 +420,6 @@ func (a *Agent) promptContinue() bool {
 	opts := selector.Options{
 		Height: 2,
 		Color:  4, // Blue
-		Prefix: "→ ",
 	}
 
 	model := selector.New(items, opts)
@@ -416,7 +455,6 @@ func (a *Agent) promptExecute() executeChoice {
 	opts := selector.Options{
 		Height: 3,
 		Color:  4, // Blue
-		Prefix: "→ ",
 	}
 
 	model := selector.New(items, opts)
