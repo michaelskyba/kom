@@ -291,6 +291,12 @@ func (a *Agent) Run(userMessage string) error {
 				stderrContent := strings.TrimSpace(result.Stderr)
 				exitCode := result.ExitCode
 
+				// Only print blank line before output if there's any output to display
+				hasOutput := stdoutContent != "" || stderrContent != "" || exitCode != 0
+				if hasOutput {
+					fmt.Println()
+				}
+
 				if stdoutContent != "" {
 					cyan := color.New(color.FgCyan)
 					cyan.Print(indentMultiline(stdoutContent))
