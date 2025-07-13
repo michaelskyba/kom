@@ -57,11 +57,17 @@ type Config struct {
 
 func New(cfg Config) (*Agent, error) {
 	if cfg.ConversationDir == "" {
-		tmpDir, err := os.MkdirTemp("", "hnt-agent-*")
+		// Use standard hnt-chat conversation directory
+		baseDir, err := chat.GetConversationsDir()
 		if err != nil {
-			return nil, fmt.Errorf("failed to create temp dir: %w", err)
+			return nil, fmt.Errorf("failed to get conversations dir: %w", err)
 		}
-		cfg.ConversationDir = tmpDir
+		
+		convDir, err := chat.CreateNewConversation(baseDir)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create conversation: %w", err)
+		}
+		cfg.ConversationDir = convDir
 	}
 
 	pwd := cfg.PWD
@@ -305,9 +311,11 @@ func (a *Agent) streamLLMResponse() (string, string, error) {
 				// Flush any remaining buffered content
 				if contentBuffer.Len() > 0 {
 					a.printWrappedText(contentBuffer.String(), &currentColumn, wrapAt, nil)
+					contentBuffer.Reset()
 				}
 				if reasoningChunkBuffer.Len() > 0 {
 					a.printWrappedText(reasoningChunkBuffer.String(), &currentColumn, wrapAt, yellow)
+					reasoningChunkBuffer.Reset()
 				}
 				return response.String(), reasoningBuffer.String(), nil
 			}
@@ -319,20 +327,9 @@ func (a *Agent) streamLLMResponse() (string, string, error) {
 					isFirstToken = false
 				}
 
-				contentBuffer.WriteString(event.Content)
+				// Print content directly without buffering
+				a.printWrappedText(event.Content, &currentColumn, wrapAt, nil)
 				response.WriteString(event.Content)
-
-				// Only print complete segments (ending with space or newline)
-				content := contentBuffer.String()
-				lastSpace := strings.LastIndexAny(content, " \n")
-				if lastSpace >= 0 {
-					toPrint := content[:lastSpace+1]
-					a.printWrappedText(toPrint, &currentColumn, wrapAt, nil)
-					contentBuffer.Reset()
-					if lastSpace < len(content)-1 {
-						contentBuffer.WriteString(content[lastSpace+1:])
-					}
-				}
 			}
 
 			if event.Reasoning != "" && !a.IgnoreReasoning {
@@ -346,20 +343,9 @@ func (a *Agent) streamLLMResponse() (string, string, error) {
 					inReasoning = true
 				}
 
-				reasoningChunkBuffer.WriteString(event.Reasoning)
+				// Print reasoning directly without buffering
+				a.printWrappedText(event.Reasoning, &currentColumn, wrapAt, yellow)
 				reasoningBuffer.WriteString(event.Reasoning)
-
-				// Only print complete segments
-				reasoning := reasoningChunkBuffer.String()
-				lastSpace := strings.LastIndexAny(reasoning, " \n")
-				if lastSpace >= 0 {
-					toPrint := reasoning[:lastSpace+1]
-					a.printWrappedText(toPrint, &currentColumn, wrapAt, yellow)
-					reasoningChunkBuffer.Reset()
-					if lastSpace < len(reasoning)-1 {
-						reasoningChunkBuffer.WriteString(reasoning[lastSpace+1:])
-					}
-				}
 			}
 		case err := <-errChan:
 			if err != nil {
